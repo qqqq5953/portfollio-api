@@ -8,8 +8,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const results = await yahooFinance.search(symbol);
-    res.status(200).json(results);
+    const queryOptions = { period1: "2025-07-23" };
+    const result = await yahooFinance.chart(symbol, queryOptions);
+    res.status(200).json(result);
   } catch (error) {
     console.error("Yahoo Finance Error:", error);
     res.status(500).json({ error: "Failed to fetch stock data" });
