@@ -1,6 +1,11 @@
 import yahooFinance from "yahoo-finance2";
 
 export default async function handler(req, res) {
+  // Allow requests from anywhere (or restrict to your frontend URL)
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
   const { symbol } = req.query;
 
   if (!symbol) {
