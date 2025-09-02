@@ -53,9 +53,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? { period1, period2: processDateParameter(end) }
       : { period1 };
 
+    console.log("queryOptions", queryOptions);
+
     const result = await yahooFinance.chart(symbol, queryOptions);
+    console.log("result", result);
     res.status(200).json({
-      quotes: result.quotes,
+      closePrice: result.quotes.length > 0 ? result.quotes[0].close : result.meta.regularMarketPrice,
     });
   } catch (error) {
     console.error("Yahoo Finance Error:", error);
