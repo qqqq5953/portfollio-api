@@ -1,67 +1,85 @@
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
 import { VercelRequest, VercelResponse } from "@vercel/node";
+
+const yahooFinance = new YahooFinance({
+    suppressNotices: ["yahooSurvey"],
+});
 
 // Helper function to process date parameter (string) to appropriate format
 function processDateParameter(dateParam: string): string | number {
-  // Check if the string is a timestamp (all digits, possibly with decimal)
-  if (/^\d+(\.\d+)?$/.test(dateParam)) {
-    // It's a timestamp string, convert to number and divide by 1000 for Yahoo Finance API
+// Check if the string is a timestamp (all digits, possibly with decimal)
+if (/^\d+(\.\d+)?$/.test(dateParam)) {
+// It's a timestamp string, convert to number and divide by 1000 for Yahoo Finance API
     return Number(dateParam) / 1000;
-  }
-  // It's a yyyy-mm-dd format string, return as is
-  return dateParam;
+}
+// It's a yyyy-mm-dd format string, return as is
+    return dateParam;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Allow requests from anywhere (or restrict to your frontend URL)
-  res.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
-  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    // Allow requests from anywhere (or restrict to your frontend URL)
+    res.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
+    res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  console.log("req.query", req.query);
+    console.log("req.query", req.query);
 
-  const { symbol, start, end } = req.query;
+    const { symbol, start, end } = req.query;
 
-  if (!symbol) {
-    return res.status(400).json({ error: "Missing symbol query parameter" });
-  }
+    if (!symbol) {
+        return res.status(400).json({ error: "Missing symbol query parameter" });
+    }
 
-  if (Array.isArray(symbol)) {
-    return res.status(400).json({ error: "Only one symbol is allowed" });
-  }
+    if (Array.isArray(symbol)) {
+        return res.status(400).json({ error: "Only one symbol is allowed" });
+    }
 
-  if (Array.isArray(start)) {
-    return res.status(400).json({ error: "Only one start date is allowed" });
-  }
+    if (Array.isArray(start)) {
+        return res.status(400).json({ error: "Only one start date is allowed" });
+    }
 
-  if (Array.isArray(end)) {
-    return res.status(400).json({ error: "Only one end date is allowed" });
-  }
+    if (Array.isArray(end)) {
+        return res.status(400).json({ error: "Only one end date is allowed" });
+    }
 
-  if (start == end) {
-    return res
-      .status(400)
-      .json({ error: "Start and end dates cannot be the same" });
-  }
+    if (start == end) {
+        return res
+            .status(400)
+            .json({ error: "Start and end dates cannot be the same" });
+    }
 
-  const date = new Date();
-  const today = new Intl.DateTimeFormat("en-CA").format(date);
+    const date = new Date();
+    const today = new Intl.DateTimeFormat("en-CA").format(date);
 
-  try {
-    const period1 = start ? processDateParameter(start) : today;
-    const queryOptions = end
-      ? { period1, period2: processDateParameter(end) }
-      : { period1 };
+    try {
+        const period1 = start ? processDateParameter(start) : today;
+        const queryOptions = end
+            ? { period1, period2: processDateParameter(end), events: 'split' }
+            : { period1 };
 
-    console.log("queryOptions", queryOptions);
-
-    const result = await yahooFinance.chart(symbol, queryOptions);
-    console.log("result", result);
-    res.status(200).json({
-      closePrice: result.quotes.length > 0 ? result.quotes[0].close : result.meta.regularMarketPrice,
-    });
-  } catch (error) {
-    console.error("Yahoo Finance Error:", error);
-    res.status(500).json({ error: "Failed to fetch stock data" });
-  }
+        console.log("queryOptions", queryOptions);
+        const result = await yahooFinance.chart(symbol, queryOptions);
+        console.log("result", result);
+        res.status(200).json(result.quotes.length > 0
+            ? {
+                date: result.quotes[0].date,
+                closePrice: result.quotes[0].close,
+                adjustedClosePrice: result.quotes[0].adjclose,
+            }
+            : {
+                date: null,
+                closePrice: result.meta.regularMarketPrice,
+                adjustedClosePrice: result.meta.regularMarketPrice,
+            }
+        );
+    } catch (error) {
+        console.error("Yahoo Finance Error:", error);
+        // Check if it's a rate limit error
+        if (error.message && error.message.includes("Too Many Requests")) {
+            return res.status(429).json({ 
+                error: "Rate limit exceeded. Please try again later." 
+            });
+        }
+        res.status(500).json({ error: "Failed to fetch stock data" });
+    }
 }
